@@ -1,0 +1,438 @@
+name: Build Spider Clock APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Create complete Android project
+        shell: bash
+        run: |
+          mkdir -p "$(dirname 'README.md')"
+          cat > 'README.md' <<'EOF_6169066586091668968'
+          # Spider Clock
+          
+          Android home-screen widget inspired by the supplied Spider Clock reference.
+          
+          Features:
+          - Live hour and minute shown as long spider legs
+          - Eight thin spider legs
+          - White spider body and hands
+          - 1 to 12 clock numbers
+          - Warm brown reference-style background
+          - Resizeable home-screen widget
+          - Refreshes every minute
+          - Tap the widget to open the app
+          
+          ## Build the APK
+          
+          1. Open this folder in Android Studio.
+          2. Let Gradle sync.
+          3. Run `app > Tasks > build > assembleDebug`.
+          
+          The APK will be at:
+          `app/build/outputs/apk/debug/app-debug.apk`
+          
+          There is also a GitHub Actions workflow at `.github/workflows/build-apk.yml` that builds the APK automatically when pushed to GitHub.
+          EOF_6169066586091668968
+
+          mkdir -p "$(dirname 'app/build.gradle.kts')"
+          cat > 'app/build.gradle.kts' <<'EOF_8643840671088181849'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+          
+          android {
+              namespace = "com.spiderclock.app"
+              compileSdk = 35
+          
+              defaultConfig {
+                  applicationId = "com.spiderclock.app"
+                  minSdk = 23
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+          
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+                  }
+              }
+          
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          EOF_8643840671088181849
+
+          mkdir -p "$(dirname 'app/proguard-rules.pro')"
+          cat > 'app/proguard-rules.pro' <<'EOF_4937638828906156220'
+          EOF_4937638828906156220
+
+          mkdir -p "$(dirname 'app/src/main/AndroidManifest.xml')"
+          cat > 'app/src/main/AndroidManifest.xml' <<'EOF_842520278370343757'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application
+                  android:theme="@style/Theme.SpiderClock"
+                  android:label="@string/app_name"
+                  android:allowBackup="true"
+                  android:supportsRtl="true">
+                  <activity android:name=".MainActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <receiver
+                      android:name=".SpiderClockWidget"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                          <action android.intent.action.TIME_TICK />
+                          <action android.intent.action.TIME_CHANGED />
+                          <action android.intent.action.TIMEZONE_CHANGED />
+                          <action android.intent.action.DATE_CHANGED />
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.appwidget.provider"
+                          android:resource="@xml/spider_clock_info" />
+                  </receiver>
+              </application>
+          </manifest>
+          EOF_842520278370343757
+
+          mkdir -p "$(dirname 'app/src/main/java/com/spiderclock/app/MainActivity.kt')"
+          cat > 'app/src/main/java/com/spiderclock/app/MainActivity.kt' <<'EOF_2412254719996301543'
+          package com.spiderclock.app
+          
+          import android.appwidget.AppWidgetManager
+          import android.content.ComponentName
+          import android.content.Context
+          import android.os.Bundle
+          import android.widget.TextView
+          import android.app.Activity
+          
+          class MainActivity : Activity() {
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  val text = TextView(this).apply {
+                      text = "Spider Clock\n\nAdd the Spider Clock widget from your home screen widgets.\n\nThe spider body is fixed and its long legs show the current hour and minute."
+                      textSize = 18f
+                      setTextColor(0xFFFFFFFF.toInt())
+                      setBackgroundColor(0xFF000000.toInt())
+                      setPadding(48, 80, 48, 48)
+                  }
+                  setContentView(text)
+                  SpiderClockWidget.updateAll(this)
+              }
+          }
+          EOF_2412254719996301543
+
+          mkdir -p "$(dirname 'app/src/main/java/com/spiderclock/app/SpiderClockWidget.kt')"
+          cat > 'app/src/main/java/com/spiderclock/app/SpiderClockWidget.kt' <<'EOF_2534461393514574301'
+          package com.spiderclock.app
+          
+          import android.app.AlarmManager
+          import android.app.PendingIntent
+          import android.appwidget.AppWidgetManager
+          import android.appwidget.AppWidgetProvider
+          import android.content.ComponentName
+          import android.content.Context
+          import android.content.Intent
+          import android.graphics.*
+          import android.os.Build
+          import android.widget.RemoteViews
+          import java.util.Calendar
+          import kotlin.math.cos
+          import kotlin.math.min
+          import kotlin.math.sin
+          
+          class SpiderClockWidget : AppWidgetProvider() {
+              override fun onEnabled(context: Context) {
+                  super.onEnabled(context)
+                  scheduleNextMinute(context)
+              }
+          
+              override fun onDisabled(context: Context) {
+                  cancelTick(context)
+                  super.onDisabled(context)
+              }
+          
+              override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
+                  for (id in ids) updateOne(context, manager, id)
+                  scheduleNextMinute(context)
+              }
+          
+              companion object {
+                  private const val ACTION_TICK = "com.spiderclock.app.ACTION_TICK"
+          
+                  fun updateWidgets(context: Context, manager: AppWidgetManager, ids: IntArray) {
+                      for (id in ids) updateOne(context, manager, id)
+                      scheduleNextMinute(context)
+                  }
+          
+                  fun updateAll(context: Context) {
+                      val manager = AppWidgetManager.getInstance(context)
+                      val ids = manager.getAppWidgetIds(ComponentName(context, SpiderClockWidget::class.java))
+                      for (id in ids) updateOne(context, manager, id)
+                      if (ids.isNotEmpty()) scheduleNextMinute(context)
+                  }
+          
+                  private fun updateOne(context: Context, manager: AppWidgetManager, id: Int) {
+                      val options = manager.getAppWidgetOptions(id)
+                      val widthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 180).coerceAtLeast(120)
+                      val heightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 180).coerceAtLeast(120)
+                      val density = context.resources.displayMetrics.density
+                      val size = min(widthDp, heightDp).coerceIn(120, 700)
+                      val px = (size * density).toInt().coerceIn(240, 1800)
+                      val bitmap = drawClock(px, px)
+                      val views = RemoteViews(context.packageName, R.layout.widget_spider_clock)
+                      views.setImageViewBitmap(R.id.clock_image, bitmap)
+                      val open = Intent(context, MainActivity::class.java)
+                      val pi = PendingIntent.getActivity(context, id, open, PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag())
+                      views.setOnClickPendingIntent(R.id.clock_image, pi)
+                      manager.updateAppWidget(id, views)
+                  }
+          
+                  private fun immutableFlag(): Int = if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
+          
+                  private fun drawClock(w: Int, h: Int): Bitmap {
+                      val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                      val c = Canvas(b)
+                      c.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+          
+                      val cx = w / 2f
+                      val cy = h / 2f
+                      val r = min(w, h) * 0.455f
+                      val white = Color.argb(245, 250, 250, 250)
+                      val soft = Color.argb(72, 255, 255, 255)
+          
+                      // Warm brown panel like the reference, with transparency outside the dial.
+                      val bg = Paint(Paint.ANTI_ALIAS_FLAG)
+                      bg.shader = LinearGradient(0f, 0f, w.toFloat(), h.toFloat(), Color.rgb(176, 91, 4), Color.rgb(112, 56, 0), Shader.TileMode.CLAMP)
+                      c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), bg)
+          
+                      val faint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                          color = Color.argb(28, 255, 255, 255)
+                          style = Paint.Style.STROKE
+                          strokeWidth = maxOf(1f, w / 320f)
+                      }
+                      // Very subtle ornamental rings behind the spider, matching the reference mood.
+                      c.drawCircle(cx, cy, r * 0.86f, faint)
+                      c.drawCircle(cx, cy, r * 0.67f, faint)
+          
+                      // Clock numbers.
+                      val numPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                          color = Color.argb(165, 245, 245, 245)
+                          textAlign = Paint.Align.CENTER
+                          typeface = Typeface.create("sans", Typeface.NORMAL)
+                          textSize = r * 0.12f
+                      }
+                      for (n in 1..12) {
+                          val angle = Math.toRadians((n * 30.0) - 90.0)
+                          val nr = r * 0.78f
+                          val x = cx + cos(angle).toFloat() * nr
+                          val y = cy + sin(angle).toFloat() * nr - (numPaint.ascent() + numPaint.descent()) / 2f
+                          c.drawText(n.toString(), x, y, numPaint)
+                      }
+          
+                      val now = Calendar.getInstance()
+                      val hour = now.get(Calendar.HOUR) + now.get(Calendar.MINUTE) / 60f
+                      val minute = now.get(Calendar.MINUTE) + now.get(Calendar.SECOND) / 60f
+                      val hourAngle = Math.toRadians(hour * 30.0 - 90.0)
+                      val minuteAngle = Math.toRadians(minute * 6.0 - 90.0)
+          
+                      val leg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                          color = white
+                          style = Paint.Style.STROKE
+                          strokeCap = Paint.Cap.ROUND
+                          strokeJoin = Paint.Join.ROUND
+                          strokeWidth = maxOf(2.2f, w / 105f)
+                      }
+          
+                      // Eight thin spider legs.
+                      for (i in 0 until 8) {
+                          val a = Math.toRadians(i * 45.0 + 7.0)
+                          val side = if (i % 2 == 0) 1f else 0.92f
+                          val inner = r * 0.06f
+                          val mid = r * 0.26f
+                          val outer = r * (0.42f + 0.05f * side)
+                          val x1 = cx + cos(a).toFloat() * inner
+                          val y1 = cy + sin(a).toFloat() * inner
+                          val x2 = cx + cos(a).toFloat() * mid
+                          val y2 = cy + sin(a).toFloat() * mid
+                          val bend = a + if (sin(a) >= 0) 0.16 else -0.16
+                          val x3 = cx + cos(bend).toFloat() * outer
+                          val y3 = cy + sin(bend).toFloat() * outer
+                          val path = Path().apply { moveTo(x1, y1); lineTo(x2, y2); lineTo(x3, y3) }
+                          c.drawPath(path, leg)
+                      }
+          
+                      // Long spider legs act as the hour and minute hands.
+                      drawHand(c, cx, cy, hourAngle, r * 0.59f, maxOf(3f, w / 70f), white)
+                      drawHand(c, cx, cy, minuteAngle, r * 0.77f, maxOf(2.3f, w / 90f), white)
+          
+                      // Spider body.
+                      val body = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
+                      c.drawOval(cx - r * 0.085f, cy - r * 0.13f, cx + r * 0.085f, cy + r * 0.12f, body)
+                      c.drawCircle(cx, cy - r * 0.15f, r * 0.065f, body)
+          
+                      // Tiny darker separation between head and body.
+                      val seam = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(80, 130, 70, 10); strokeWidth = maxOf(1f, w / 300f) }
+                      c.drawLine(cx - r * 0.045f, cy - r * 0.055f, cx + r * 0.045f, cy - r * 0.055f, seam)
+          
+                      return b
+                  }
+          
+                  private fun drawHand(c: Canvas, cx: Float, cy: Float, angle: Double, length: Float, width: Float, color: Int) {
+                      val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                          this.color = color
+                          style = Paint.Style.STROKE
+                          strokeCap = Paint.Cap.ROUND
+                          strokeWidth = width
+                      }
+                      val back = length * 0.16f
+                      val x1 = cx - cos(angle).toFloat() * back
+                      val y1 = cy - sin(angle).toFloat() * back
+                      val x2 = cx + cos(angle).toFloat() * length
+                      val y2 = cy + sin(angle).toFloat() * length
+                      c.drawLine(x1, y1, x2, y2, p)
+                  }
+          
+                  private fun scheduleNextMinute(context: Context) {
+                      val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                      val intent = Intent(context, SpiderClockWidget::class.java).setAction(ACTION_TICK)
+                      val pi = PendingIntent.getBroadcast(context, 9147, intent, PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag())
+                      val now = System.currentTimeMillis()
+                      val next = ((now / 60000L) + 1L) * 60000L + 250L
+                      alarm.cancel(pi)
+                      if (Build.VERSION.SDK_INT >= 23) alarm.setExactAndAllowWhileIdle(AlarmManager.RTC, next, pi)
+                      else alarm.setExact(AlarmManager.RTC, next, pi)
+                  }
+          
+                  private fun cancelTick(context: Context) {
+                      val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                      val intent = Intent(context, SpiderClockWidget::class.java).setAction(ACTION_TICK)
+                      val pi = PendingIntent.getBroadcast(context, 9147, intent, PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag())
+                      alarm.cancel(pi)
+                  }
+              }
+          
+              override fun onReceive(context: Context, intent: Intent) {
+                  super.onReceive(context, intent)
+                  when (intent.action) {
+                      ACTION_TICK, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_DATE_CHANGED -> {
+                          updateAll(context)
+                      }
+                  }
+              }
+          }
+          EOF_2534461393514574301
+
+          mkdir -p "$(dirname 'app/src/main/res/layout/widget_spider_clock.xml')"
+          cat > 'app/src/main/res/layout/widget_spider_clock.xml' <<'EOF_2641773562818133679'
+          <?xml version="1.0" encoding="utf-8"?>
+          <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:id="@+id/widget_root"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="@android:color/transparent"
+              android:padding="0dp">
+              <ImageView
+                  android:id="@+id/clock_image"
+                  android:layout_width="match_parent"
+                  android:layout_height="match_parent"
+                  android:scaleType="fitCenter"
+                  android:contentDescription="Spider Clock" />
+          </FrameLayout>
+          EOF_2641773562818133679
+
+          mkdir -p "$(dirname 'app/src/main/res/values/colors.xml')"
+          cat > 'app/src/main/res/values/colors.xml' <<'EOF_8847170945570632813'
+          <resources><color name="black">#000000</color></resources>
+          EOF_8847170945570632813
+
+          mkdir -p "$(dirname 'app/src/main/res/values/strings.xml')"
+          cat > 'app/src/main/res/values/strings.xml' <<'EOF_7714940668862183235'
+          <resources>
+              <string name="app_name">Spider Clock</string>
+          </resources>
+          EOF_7714940668862183235
+
+          mkdir -p "$(dirname 'app/src/main/res/values/themes.xml')"
+          cat > 'app/src/main/res/values/themes.xml' <<'EOF_4468874014966083239'
+          <resources>
+              <style name="Theme.SpiderClock" parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:colorAccent">#FFFFFF</item>
+                  <item name="android:navigationBarColor">#000000</item>
+                  <item name="android:statusBarColor">#000000</item>
+                  <item name="android:windowLightStatusBar">false</item>
+              </style>
+          </resources>
+          EOF_4468874014966083239
+
+          mkdir -p "$(dirname 'app/src/main/res/xml/spider_clock_info.xml')"
+          cat > 'app/src/main/res/xml/spider_clock_info.xml' <<'EOF_7859832658452159814'
+          <?xml version="1.0" encoding="utf-8"?>
+          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+              android:minWidth="180dp"
+              android:minHeight="180dp"
+              android:minResizeWidth="120dp"
+              android:minResizeHeight="120dp"
+              android:updatePeriodMillis="0"
+              android:initialLayout="@layout/widget_spider_clock"
+              android:resizeMode="horizontal|vertical"
+              android:widgetCategory="home_screen"
+              android:description="@string/app_name" />
+          EOF_7859832658452159814
+
+          mkdir -p "$(dirname 'build.gradle.kts')"
+          cat > 'build.gradle.kts' <<'EOF_1046800446563243383'
+          plugins {
+              id("com.android.application") version "8.7.3" apply false
+              id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+          }
+          EOF_1046800446563243383
+
+          mkdir -p "$(dirname 'settings.gradle.kts')"
+          cat > 'settings.gradle.kts' <<'EOF_6536135315568771739'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name = "SpiderClock"
+          include(":app")
+          EOF_6536135315568771739
+
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpiderClock-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
