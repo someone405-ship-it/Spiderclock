@@ -90,7 +90,6 @@ jobs:
                   applicationId = "com.spiderclock.app"
                   minSdk = 23
                   targetSdk = 35
-
                   versionCode = 1
                   versionName = "1.0"
               }
@@ -102,9 +101,6 @@ jobs:
 
                   release {
                       isMinifyEnabled = false
-
-                      // Makes the release APK directly installable for testing.
-                      // This is NOT suitable for Google Play production signing.
                       signingConfig = signingConfigs.getByName("debug")
                   }
               }
@@ -121,7 +117,7 @@ jobs:
           EOF
 
           cat > app/proguard-rules.pro <<'EOF'
-          # Spider Clock currently does not require custom ProGuard/R8 rules.
+          # No custom ProGuard rules are required.
           EOF
 
           cat > app/src/main/AndroidManifest.xml <<'EOF'
@@ -154,28 +150,20 @@ jobs:
                       android:exported="true">
 
                       <intent-filter>
-
                           <action
                               android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-
                           <action
                               android:name="android.intent.action.TIME_CHANGED" />
-
                           <action
                               android:name="android.intent.action.TIMEZONE_CHANGED" />
-
                           <action
                               android:name="android.intent.action.DATE_CHANGED" />
-
                           <action
                               android:name="android.intent.action.BOOT_COMPLETED" />
-
                           <action
                               android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-
                           <action
                               android:name="com.spiderclock.app.ACTION_TICK" />
-
                       </intent-filter>
 
                       <meta-data
@@ -187,9 +175,7 @@ jobs:
               </application>
 
           </manifest>
-          EOF
-
-          cat > app/src/main/res/values/strings.xml <<'EOF'
+          EOF          cat > app/src/main/res/values/strings.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
 
           <resources>
@@ -279,7 +265,9 @@ jobs:
                   SpiderClockWidget.updateAll(this)
               }
           }
-          EOF          cat > app/src/main/java/com/spiderclock/app/SpiderClockWidget.kt <<'EOF'
+          EOF
+
+          cat > app/src/main/java/com/spiderclock/app/SpiderClockWidget.kt <<'EOF'
           package com.spiderclock.app
 
           import android.app.AlarmManager
@@ -379,7 +367,6 @@ jobs:
                   private const val ALARM_REQUEST_CODE = 9001
 
                   fun updateAll(context: Context) {
-
                       val manager =
                           AppWidgetManager.getInstance(context)
 
@@ -412,7 +399,6 @@ jobs:
                       manager: AppWidgetManager,
                       id: Int
                   ) {
-
                       val options =
                           manager.getAppWidgetOptions(id)
 
@@ -457,18 +443,12 @@ jobs:
                           min(
                               widthDp,
                               heightDp
-                          ).coerceIn(
-                              120,
-                              600
-                          )
+                          ).coerceIn(120, 600)
 
                       val pixels =
                           (sizeDp * density)
                               .toInt()
-                              .coerceIn(
-                                  240,
-                                  1024
-                              )
+                              .coerceIn(240, 1024)
 
                       val bitmap =
                           drawClock(
@@ -524,9 +504,7 @@ jobs:
                       } else {
                           0
                       }
-                  }
-
-                  private fun tickPendingIntent(
+                  }                  private fun tickPendingIntent(
                       context: Context
                   ): PendingIntent {
 
@@ -551,7 +529,6 @@ jobs:
                   private fun scheduleNextMinute(
                       context: Context
                   ) {
-
                       val alarmManager =
                           context.getSystemService(
                               Context.ALARM_SERVICE
@@ -563,8 +540,7 @@ jobs:
                       val now =
                           System.currentTimeMillis()
 
-                      val minute =
-                          60_000L
+                      val minute = 60_000L
 
                       val nextMinute =
                           ((now / minute) + 1L) * minute
@@ -573,15 +549,12 @@ jobs:
                           Build.VERSION.SDK_INT >=
                           Build.VERSION_CODES.M
                       ) {
-
                           alarmManager.setAndAllowWhileIdle(
                               AlarmManager.RTC,
                               nextMinute,
                               pending
                           )
-
                       } else {
-
                           alarmManager.set(
                               AlarmManager.RTC,
                               nextMinute,
@@ -593,7 +566,6 @@ jobs:
                   private fun cancelTick(
                       context: Context
                   ) {
-
                       val alarmManager =
                           context.getSystemService(
                               Context.ALARM_SERVICE
@@ -603,9 +575,10 @@ jobs:
                           tickPendingIntent(context)
 
                       alarmManager.cancel(pending)
-
                       pending.cancel()
-                  }                  private fun drawClock(
+                  }
+
+                  private fun drawClock(
                       width: Int,
                       height: Int
                   ): Bitmap {
@@ -625,23 +598,16 @@ jobs:
                           PorterDuff.Mode.CLEAR
                       )
 
-                      val cx =
-                          width / 2f
-
-                      val cy =
-                          height / 2f
+                      val cx = width / 2f
+                      val cy = height / 2f
 
                       val radius =
-                          min(
-                              width,
-                              height
-                          ) * 0.455f
+                          min(width, height) * 0.455f
 
                       val background =
                           Paint(
                               Paint.ANTI_ALIAS_FLAG
                           ).apply {
-
                               shader =
                                   LinearGradient(
                                       0f,
@@ -684,7 +650,6 @@ jobs:
                           Paint(
                               Paint.ANTI_ALIAS_FLAG
                           ).apply {
-
                               color =
                                   Color.argb(
                                       35,
@@ -721,7 +686,6 @@ jobs:
                           Paint(
                               Paint.ANTI_ALIAS_FLAG
                           ).apply {
-
                               color =
                                   Color.argb(
                                       190,
@@ -744,7 +708,6 @@ jobs:
                           }
 
                       for (number in 1..12) {
-
                           val angle =
                               Math.toRadians(
                                   number * 30.0 - 90.0
@@ -755,13 +718,11 @@ jobs:
 
                           val x =
                               cx +
-                                  cos(angle).toFloat() *
-                                  nr
+                                  cos(angle).toFloat() * nr
 
                           val y =
                               cy +
-                                  sin(angle).toFloat() *
-                                  nr -
+                                  sin(angle).toFloat() * nr -
                                   (
                                       numbers.ascent() +
                                           numbers.descent()
@@ -808,7 +769,6 @@ jobs:
                           Paint(
                               Paint.ANTI_ALIAS_FLAG
                           ).apply {
-
                               color = white
 
                               style =
@@ -828,7 +788,6 @@ jobs:
                           }
 
                       for (i in 0 until 8) {
-
                           val angle =
                               Math.toRadians(
                                   i * 45.0 + 7.0
@@ -845,23 +804,19 @@ jobs:
 
                           val x1 =
                               cx +
-                                  cos(angle).toFloat() *
-                                  inner
+                                  cos(angle).toFloat() * inner
 
                           val y1 =
                               cy +
-                                  sin(angle).toFloat() *
-                                  inner
+                                  sin(angle).toFloat() * inner
 
                           val x2 =
                               cx +
-                                  cos(angle).toFloat() *
-                                  middle
+                                  cos(angle).toFloat() * middle
 
                           val y2 =
                               cy +
-                                  sin(angle).toFloat() *
-                                  middle
+                                  sin(angle).toFloat() * middle
 
                           val bend =
                               angle +
@@ -875,40 +830,24 @@ jobs:
 
                           val x3 =
                               cx +
-                                  cos(bend).toFloat() *
-                                  outer
+                                  cos(bend).toFloat() * outer
 
                           val y3 =
                               cy +
-                                  sin(bend).toFloat() *
-                                  outer
+                                  sin(bend).toFloat() * outer
 
                           val path =
                               Path().apply {
-
-                                  moveTo(
-                                      x1,
-                                      y1
-                                  )
-
-                                  lineTo(
-                                      x2,
-                                      y2
-                                  )
-
-                                  lineTo(
-                                      x3,
-                                      y3
-                                  )
+                                  moveTo(x1, y1)
+                                  lineTo(x2, y2)
+                                  lineTo(x3, y3)
                               }
 
                           canvas.drawPath(
                               path,
                               legs
                           )
-                      }
-
-                      drawHand(
+                      }                      drawHand(
                           canvas,
                           cx,
                           cy,
@@ -938,7 +877,6 @@ jobs:
                           Paint(
                               Paint.ANTI_ALIAS_FLAG
                           ).apply {
-
                               color =
                                   Color.WHITE
 
@@ -965,7 +903,6 @@ jobs:
                           Paint(
                               Paint.ANTI_ALIAS_FLAG
                           ).apply {
-
                               color =
                                   Color.rgb(
                                       112,
@@ -996,12 +933,10 @@ jobs:
                       strokeWidth: Float,
                       color: Int
                   ) {
-
                       val paint =
                           Paint(
                               Paint.ANTI_ALIAS_FLAG
                           ).apply {
-
                               this.color = color
 
                               style =
@@ -1016,13 +951,11 @@ jobs:
 
                       val endX =
                           cx +
-                              cos(angle).toFloat() *
-                              length
+                              cos(angle).toFloat() * length
 
                       val endY =
                           cy +
-                              sin(angle).toFloat() *
-                              length
+                              sin(angle).toFloat() * length
 
                       canvas.drawLine(
                           cx,
@@ -1034,21 +967,46 @@ jobs:
                   }
               }
           }
-          EOF      - name: Validate project files
+          EOF      - name: Validate generated project
         shell: bash
         run: |
           set -e
 
           test -f settings.gradle.kts
           test -f build.gradle.kts
+          test -f gradle.properties
           test -f app/build.gradle.kts
+          test -f app/proguard-rules.pro
           test -f app/src/main/AndroidManifest.xml
+          test -f app/src/main/res/values/strings.xml
+          test -f app/src/main/res/values/styles.xml
           test -f app/src/main/res/layout/widget_spider_clock.xml
           test -f app/src/main/res/xml/spider_clock_info.xml
           test -f app/src/main/java/com/spiderclock/app/MainActivity.kt
           test -f app/src/main/java/com/spiderclock/app/SpiderClockWidget.kt
 
-          echo "Project files verified."
+          echo "All generated files exist."
+
+      - name: Check XML files
+        shell: bash
+        run: |
+          set -e
+
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          files = [
+              "app/src/main/AndroidManifest.xml",
+              "app/src/main/res/values/strings.xml",
+              "app/src/main/res/values/styles.xml",
+              "app/src/main/res/layout/widget_spider_clock.xml",
+              "app/src/main/res/xml/spider_clock_info.xml",
+          ]
+
+          for file in files:
+              ET.parse(file)
+              print("Valid XML:", file)
+          PY
 
       - name: Build debug and release APKs
         shell: bash
@@ -1070,12 +1028,13 @@ jobs:
           test -f app/build/outputs/apk/debug/app-debug.apk
           test -f app/build/outputs/apk/release/app-release.apk
 
-          echo "Debug APK found."
-          echo "Release APK found."
+          echo "Debug APK:"
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
 
-          ls -lh \
-            app/build/outputs/apk/debug/app-debug.apk \
-            app/build/outputs/apk/release/app-release.apk      - name: Upload debug APK
+          echo "Release APK:"
+          ls -lh app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: SpiderClock-debug
